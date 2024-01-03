@@ -1,0 +1,741 @@
+---
+title: "Shifting Sands of Canada"
+author: "Analyzing Changing Interprovincial Migration Trends"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+    latex_engine: xelatex
+  html_document:
+    df_print: paged
+  word_document: default
+header-includes: \usepackage{setspace}
+always_allow_html: yes
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+------------------------------------------------------------------------
+
+# TEAM MEMBERS: Group SAAS
+
+## *Huynh Hiep Tran (Alex)* - T00728369
+
+## *Shivani Tyagi* - T00727866
+
+## *Sayantika Saha* - T00731231
+
+## *Mohd Asaf Shaikh* -- T00728877
+
+------------------------------------------------------------------------
+
+# TABLE OF CONTENT
+
+1.  [Project Objective](#section-one)
+2.  [About Dataset](#section-two)
+3.  [Data Preprocessing](#section-three)
+4.  [Trend Analysis](#section-four)
+5.  [Hypothesis Testing](#section-five)
+6.  [Conclusion](#section-six)
+7.  [References](#section-seven)
+
+------------------------------------------------------------------------
+
+# PROJECT OBJECTIVE {#section-one}
+
+This project focuses on investigating **interprovincial migration in
+Canada from 1971 to 2022**, with a specific emphasis on migration
+patterns on both a yearly and quarterly basis. We aim to explore whether
+people prefer to migrate during specific times, the provinces that are
+less favored and those that attract the most migrants, and whether
+migration trends have changed over the decades. This research will
+provide valuable insights about the movement of people within the
+country and can become a rich resource for studying Canada's population
+mobility, with applications in economics, sociology, policy development,
+and urban planning.
+
+# ABOUT DATA SET {#section-two}
+
+This comprehensive dataset provides valuable information on the
+migration patterns of individuals and families across Canada from 1971
+to 2022. It specifically focuses on interprovincial migration, tracking
+the movement of people between different provinces and territories. This
+dataset is a crucial resource for understanding the dynamics of
+population movement within Canada over several decades.
+
+**Data Fields** - The dataset typically includes the following key data
+fields:
+
+1.  *Year:* The time period indicating the specific year in which the
+    migration occurred.
+
+2.  *Quarter:* The time period indicating the specific quarter in which
+    the migration occurred.
+
+3.  *Province or Territory of Origin:* The province or territory from
+    which migrants originated. This includes data on the number of
+    individuals or families moving out of each province.
+
+4.  *Province or Territory of Destination:* The province or territory to
+    which migrants are relocating. This includes data on the number of
+    individuals or families moving into each province.
+
+5.  *Number of Migrants:* The total count of individuals or families
+    moving from the destination to the specified quarter.
+
+# LOADING DATA SET
+
+```{r}
+# Reading data file 
+
+migration_data <- read.csv("C:/Users/shiva/Documents/ADSC1910/ProjectWork/interprovincial_migration.csv",
+                           header=TRUE)
+head(migration_data)
+```
+
+## Displaying Column Names
+
+```{r}
+# Display variable names
+cat("Variable Names:\n")
+print(names(migration_data))
+```
+
+## Checking Dimensions of the dataset
+
+```{r}
+# Display dimensions of the dataset
+cat("\nDimensions of the Dataset :\n")
+print(dim(migration_data))
+```
+
+## Exploring Data Summary
+
+```{r}
+# Display summary statistics for numeric variables
+cat("\nSummary Statistics of the Dataset :\n")
+print(summary(migration_data))
+```
+
+```{r}
+# We can also use the 'describe' function from the 'psych' package for a more detailed summary
+library(psych)
+describe(migration_data)
+
+```
+
+```{r}
+# Display the first few rows of the dataset
+print(tail(migration_data))
+```
+
+```{r, warning=FALSE}
+library(tidymodels)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(plotly)
+
+glimpse(migration_data)
+```
+
+```{r}
+# Check for missing values in the migration_data data frame
+missing_values <- sapply(migration_data, function(x) sum(is.na(x)))
+
+# Print the number of missing values for each column
+print(missing_values)
+```
+
+------------------------------------------------------------------------
+
+# DATA PRE-PROCESSING {#section-three}
+
+## CREATE A NEW COLUMN BASED ON "Origin" Column ; a new column will be created with the full names of the Canadian provinces and territories using a lookup table.
+
+```{r}
+# Load the dplyr package if you haven't already
+#library(dplyr)
+
+# Create a data frame with the abbreviations and full names
+state_data <- data.frame(
+  Origin = c("N.L.", "P.E.I.", "N.S.", "N.B.", "Que.", "Ont.", "Man.", "Sask.", "Alta.", "B.C.", "Y.T.", "N.W.T.", "Nvt."),
+  ProvinceNames = c("Newfoundland and Labrador", "Prince Edward Island", "Nova Scotia", "New Brunswick", "Quebec", "Ontario", "Manitoba", "Saskatchewan", "Alberta", "British Columbia", "Yukon", "Northwest Territories", "Nunavut")
+)
+state_data
+```
+
+```{r}
+# Use mutate to add the Full_Name column to the migration dataset
+result_data <- migration_data %>%
+  right_join(state_data, by = c("Origin" = "Origin"))%>%
+  select(Year, Quarter, Origin, ProvinceNames, everything())
+```
+
+```{r}
+result_data <- result_data %>%
+  rename(
+    `Newfoundland and Labrador` = "N.L.",
+    `Prince Edward Island` = "P.E.I.",
+    `Nova Scotia` = "N.S.",
+    `New Brunswick` = "N.B.",
+    `Quebec` = "Que.",
+    `Ontario` = "Ont.",
+    `Manitoba` = "Man.",
+    `Saskatchewan` = "Sask.",
+    `Alberta` = "Alta.",
+    `British Columbia` = "B.C.",
+    `Yukon` = "Y.T.",
+    `Northwest Territories` = "N.W.T.",
+    `Nunavut` = "Nvt."
+  )
+
+head(result_data, 5)
+```
+
+# TREND ANALYSIS {#section-four}
+
+## Trends in Migration Over the years
+
+```{r}
+# Total migration over years
+total_migration <- aggregate(. ~ Year, data = result_data[, -c(3:4)], FUN = sum, na.rm = TRUE)
+
+# Plotting total migration over years
+ggplotly(ggplot(total_migration, aes(x = Year, y = Total)) +
+  geom_line() +
+  labs(title = "Total Migration Over Years",
+       x = "Year",
+       y = "Total Migration"))
+```
+
+*OBSERVATIONS :* Immigrants trend across Canadian provinces doesn't
+follow a patterned trend.Although, the recent years have a range of
+migration count peaks (280k\~330k) that can be seen in the plot above.
+
+# Quarterly migration trends by province
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(plotly)
+
+
+# Filtering numeric columns from the original dataset
+numeric_cols <- result_data %>%
+  select(-c(Year, Quarter, ProvinceNames, Total)) %>%
+  sapply(is.numeric)
+
+# Extracting the names of numeric columns
+numeric_col_names <- names(numeric_cols)[numeric_cols]
+
+# Selecting the numeric columns and necessary identifier columns for melting
+selected_cols <- c("Year", "Quarter", "ProvinceNames", "Total",numeric_col_names)
+selected_data <- result_data[, selected_cols]
+
+# Melting the selected numeric columns
+melted_data <- selected_data %>%
+  pivot_longer(cols = -c(Year, Quarter, ProvinceNames, Total), names_to = "Province", values_to = "MigrationCount")
+
+# Plotting quarterly migration trends by province for numeric columns
+plot_years <- ggplot(melted_data, aes(x = Quarter, y = MigrationCount, color = Province)) +
+  geom_line(size = 1) +
+  facet_wrap(~Province, scales = "free_y") +
+  labs(title = "Quarterly Migration Trends Across Provinces",
+       x = "Quarters",
+       y = "Migration Count",
+       color = "Province") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title = element_text(size = 12),
+        legend.title = element_text(size = 10),
+        legend.text = element_text(size = 8))
+
+# Interactive plot
+interactive_plot <- ggplotly(plot_years, tooltip = c("x", "y", "color")) %>%
+  layout(title = list(text = "Quarterly Migration Trends Across Provinces", size = 16),
+         xaxis = list(title = "Quarters", tickfont = list(size = 10)),
+         yaxis = list(title = "Migration Count", tickfont = list(size = 10)),
+         legend = list(font = list(size = 8)))
+
+interactive_plot
+
+```
+
+*OBSERVATIONS :* Not much of a pattern can be seen except for the fact
+that majority of the provinces have high migration phase going on across
+Quarter 2 & 3.
+
+## Migration Across Candidan Province
+
+```{r, warning=FALSE}
+library(openintro)
+library(ggplot2)
+library(plotly)
+
+
+bar_chart <-  ggplot(result_data, aes(x = ProvinceNames, y = Total, fill = ProvinceNames)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(
+    title = "MIGRANTS IN PROVINCE : 1971 to 2022",
+    y = "MIGRANTS COUNT"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+# Get the maximum count for each province
+max_counts <- result_data %>%
+  group_by(ProvinceNames) %>%
+  summarise(Max_Count = max(Total))
+
+# Add maximum count labels directly to the bars
+bar_chart +
+  geom_text(data = max_counts, aes(label = Max_Count, y = Max_Count+205000), size = 4.5, 
+            position = position_stack(vjust = 1.9), angle = 90, 
+            hjust = 0.5, vjust = 0.5, 
+            family = "sans") + theme(legend.position = "none")
+
+```
+
+## Migration Across Candidan Province Across Three Year Ranges
+
+```{r}
+# Dividing years into three equal ranges
+range_1 <- result_data %>% filter(Year >= 1971 & Year <= 1991)
+range_2 <- result_data %>% filter(Year >= 1992 & Year <= 2006)
+range_3 <- result_data %>% filter(Year >= 2007 & Year <= 2022)
+
+# Creating plots for each range
+plot_range_1 <- ggplot(range_1, aes(x = ProvinceNames, y = Total, fill = ProvinceNames)) +
+  geom_bar(stat = "identity") +
+  labs(title = "1971-1991", x = "Province", y = "Count") +
+  theme_minimal()+
+  xlab("") + 
+  theme(axis.text.x = element_blank(),  
+        axis.ticks.x = element_blank()) +
+  geom_text(data = range_1 %>%
+  group_by(ProvinceNames) %>%
+  summarise(Max_Count = max(Total)), aes(label = Max_Count, y = Max_Count+205000), size = 3.5, 
+            position = position_stack(vjust = 1.9), angle = 90, 
+            hjust = 0.5, vjust = 0.5, 
+            family = "sans")
+
+
+plot_range_2 <- ggplot(range_2, aes(x = ProvinceNames, y = Total, fill = ProvinceNames)) +
+  geom_bar(stat = "identity") +
+  labs(title = "1992-2006", x = "Province", y = "Count") +
+  theme_minimal()+
+  xlab("") + 
+  theme(axis.text.x = element_blank(),  
+        axis.ticks.x = element_blank()) +
+  geom_text(data = range_2 %>%
+  group_by(ProvinceNames) %>%
+  summarise(Max_Count = max(Total)), aes(label = Max_Count, y = Max_Count+205000), size = 3.5, 
+            position = position_stack(vjust = 1.9), angle = 90, 
+            hjust = 0.5, vjust = 0.5, 
+            family = "sans")
+
+
+plot_range_3 <- ggplot(range_3, aes(x = ProvinceNames, y = Total, fill = ProvinceNames)) +
+  geom_bar(stat = "identity") +
+  labs(title = "2007-2022", x = "Province", y = "Count") +
+  theme_minimal()+
+  xlab("") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  geom_text(data = range_3 %>%
+  group_by(ProvinceNames) %>%
+  summarise(Max_Count = max(Total)), aes(label = Max_Count, y = Max_Count+205000), size = 3.5, 
+            position = position_stack(vjust = 1.9), angle = 90, 
+            hjust = 0.5, vjust = 0.5, 
+            family = "sans")
+
+```
+
+```{r}
+library(plotly)
+library(patchwork)
+
+combined_plot <- plot_range_1+ theme(legend.position = "none") + plot_range_2 + plot_range_3 + theme(legend.position = "none") +  plot_layout(ncol = 1)
+combined_plot
+
+```
+
+*OBSERVATIONS :* "Ontario" is the province with highest migration count
+and "Nunavut" have the least migration count.
+
+## Migration Trends for Higher and Lower Migration Province Over the Quater.
+
+```{r}
+# Finding the province with the highest migration and its corresponding quarter
+highest_province <- melted_data %>%
+  group_by(Province) %>%
+  summarise(total_migration = sum(MigrationCount)) %>%
+  arrange(desc(total_migration)) %>%
+  slice(1)
+
+highest_province_name <- highest_province$Province
+
+highest_province_quarters <- melted_data %>%
+  filter(Province == highest_province_name) %>%
+  group_by(Quarter) %>%
+  summarise(total_migration = sum(MigrationCount)) %>%
+  arrange(desc(total_migration))
+
+highest_province_quarters$Quarter <- factor(highest_province_quarters$Quarter, levels = unique(highest_province_quarters$Quarter))
+
+# Finding the province with the lowest migration and its corresponding quarter
+lowest_province <- melted_data %>%
+  group_by(Province) %>%
+  summarise(total_migration = sum(MigrationCount)) %>%
+  arrange(total_migration) %>%
+  slice(1)
+
+lowest_province_name <- lowest_province$Province
+
+lowest_province_quarters <- melted_data %>%
+  filter(Province == lowest_province_name) %>%
+  group_by(Quarter) %>%
+  summarise(total_migration = sum(MigrationCount)) %>%
+  arrange(total_migration)
+
+lowest_province_quarters$Quarter <- factor(lowest_province_quarters$Quarter, levels = unique(lowest_province_quarters$Quarter))
+
+highest_province_quarters$proportion <- highest_province_quarters$total_migration / sum(highest_province_quarters$total_migration)
+
+custom_colors <- c("#17becf", "#1f77b4", "#bcbd22","#9467bd", "#e377c2", "#7f7f7f")
+
+
+plot_ly(data = highest_province_quarters, labels = ~Quarter, values = ~proportion, type = 'pie', marker = list(colors = custom_colors)) %>%
+  layout(title = paste("Migration Trends - Highest Province:", highest_province_name),
+         showlegend = TRUE)
+```
+
+*OBSERVATIONS :* Ontario have the highest trends of migrations in the
+Quarter 2 & 3. This was concluded by the quarterly trends as well.
+
+```{r}
+lowest_province_quarters$proportion <- lowest_province_quarters$total_migration / sum(lowest_province_quarters$total_migration)
+
+custom_colors <- c("#17becf", "#1f77b4", "#bcbd22","#9467bd", "#e377c2", "#7f7f7f")
+
+# Create the pie chart with custom colors
+plot_ly(data = lowest_province_quarters, labels = ~Quarter, values = ~proportion, type = 'pie', 
+        marker = list(colors = custom_colors)) %>%
+  layout(title = paste("Migration Trends - Lowest Province:", lowest_province_name),
+         showlegend = TRUE)
+```
+
+*OBSERVATIONS :* Nunavut have the highest trends of migrations in the
+Quarter 2 & 1.
+
+------------------------------------------------------------------------
+
+# HYPOTHESIS TESTING {#section-five}
+
+**HYPOTHESIS 1 : People tend to migrate more frequently either yearly or
+quarterly between Canadian provinces.**
+
+*Null Hypothesis (H0):* There is no significant association between the
+year/quarter and the frequency of migration between Canadian provinces.
+
+*Alternate Hypothesis (H1):* There is a significant association between
+the year/quarter and the frequency of migration between Canadian
+provinces.
+
+## To test this hypothesis, are using a Chi-Square (χ²) test
+
+We will organize the data into a contingency table, where rows represent
+one variable (e.g., year/quarter) and columns represent the other
+variable (e.g., provinces), with cell values being the frequencies of
+migration between provinces in each specific year/quarter.
+
+```{r, warning=FALSE}
+
+# Selecting the relevant columns for the contingency table
+data_for_test <- result_data[, c("Year", "Quarter", "Newfoundland and Labrador", "Prince Edward Island", "Nova Scotia", "New Brunswick", "Quebec", "Ontario", "Manitoba", "Saskatchewan", "Alberta", "British Columbia", "Yukon", "Northwest Territories", "Nunavut")]
+
+# Creating a contingency table
+contingency_table <- table(data_for_test$Year, data_for_test$Quarter)
+
+# Performing Chi-Square test
+chi_square_result <- chisq.test(contingency_table)
+
+#Test result
+print(chi_square_result)
+```
+
+*OBSERVATIONS :*
+
+1.  *Chi-squared Value:* The calculated chi-squared value is 36.932.
+2.  *Degrees of Freedom (df):* The degrees of freedom are 153.
+3.  *P-Value:* The obtained p-value is approximately 1.
+
+-   Chi-squared Value Interpretation: The chi-squared value of 36.932
+    indicates the magnitude of the difference between the observed and
+    expected frequencies within the contingency table.
+
+-   Degrees of Freedom: With 153 degrees of freedom, this test has
+    considered a significant number of categories and observations.
+
+-   P-Value Interpretation: The p-value of approximately 1 suggests that
+    **there's insufficient evidence to reject the null hypothesis**. A
+    p-value of 1 indicates very high probability under the null
+    hypothesis. It implies that there is no significant association
+    between the years/quarters and the migration counts among Canadian
+    provinces based on the provided data.
+
+*In summary, based on this test's results, there doesn't appear to be a
+significant relationship between the timing (years/quarters) and the
+migration counts among Canadian provinces.*
+
+------------------------------------------------------------------------
+
+**HYPOTHESIS 2 : Certain provinces consistently attract more migrants
+and can be recognized as the most favorable destinations both annually
+and quarterly.** **HYPOTHESIS 3 : Certain provinces consistently attract
+less migrants and can be recognized as the least favorable destinations
+both annually and quarterly.**
+
+*Null Hypothesis (H0):* There is no significant difference in the
+average number of migrants attracted by different provinces both
+annually and quarterly.
+
+*Alternate Hypothesis (H1):* Certain provinces consistently attract a
+significantly different number of migrants, establishing themselves as
+the more or less favorable destinations both annually and quarterly.
+
+## To test this hypothesis,we are using a t-test
+
+```{r}
+library(dplyr)
+
+# Finding provinces with the highest total migration
+highest_total <- result_data %>%
+  arrange(desc(Total)) %>%
+  distinct(ProvinceNames, .keep_all = TRUE) %>%
+  head(2) %>%
+  select(ProvinceNames, Total)
+
+# Finding provinces with the lowest total migration
+lowest_total <- result_data %>%
+  arrange(Total) %>%
+  distinct(ProvinceNames, .keep_all = TRUE) %>%
+  head(2) %>%
+  select(ProvinceNames, Total)
+
+# Extracting province names into lists
+highest_province_list <- as.list(highest_total$ProvinceNames)
+lowest_province_list <- as.list(lowest_total$ProvinceNames)
+
+cat("Provinces with the highest total migration:\n")
+print(highest_province_list)
+cat("\nProvinces with the lowest total migration:\n")
+print(lowest_province_list)
+
+```
+
+```{r}
+
+# Selecting columns of provinces for comparison
+provinces <- c('Ontario', 'Alberta' , 'Nunavut', 'Yukon')
+
+# Creating an empty list to store t-test results
+t_test_results <- list()
+
+# Looping through combinations of provinces for t-tests
+for (i in 1:(length(provinces) - 1)) {
+  for (j in (i + 1):length(provinces)) {
+    # Selecting migration data for two provinces
+    province1 <- result_data[[provinces[i]]]
+    province2 <- result_data[[provinces[j]]]
+    
+    # Performing a t-test between the two provinces
+    t_test_result <- t.test(province1, province2)
+    
+    # Storing t-test result in the list
+    comparison <- paste(provinces[i], "-", provinces[j])
+    t_test_results[[comparison]] <- t_test_result
+  }
+}
+
+# Printing the results of all t-tests
+for (comparison in names(t_test_results)) {
+  cat(comparison, ":\n")
+  print(t_test_results[[comparison]])
+  cat("\n")
+  cat("--------------------------------------------\n")
+}
+
+```
+
+*OBSERVATIONS :*
+
+1.  *Ontario vs. Alberta:* There's a statistically significant
+    difference in the average number of migrants attracted by Ontario
+    and Alberta, with Ontario having a slightly higher average. The
+    p-value of 0.04393 suggests a moderate level of confidence in
+    rejecting the null hypothesis, indicating a potential difference in
+    migration numbers between these provinces.
+
+2.  *Ontario vs. Nunavut / Yukon:* Comparing Ontario with Nunavut and
+    Yukon shows a substantial difference in migration numbers. e
+    p-values are extremely low (p-value \< 2.2e-16), indicating an
+    exceedingly high level of confidence in rejecting the null
+    hypothesis. Ontario attracts significantly more migrants compared to
+    Nunavut and Yukon.
+
+3.  *Alberta vs. Nunavut / Yukon:* Similar to Ontario, Alberta attracts
+    significantly more migrants compared to Nunavut and Yukon. The
+    p-values are very low, indicating strong evidence against the null
+    hypothesis.
+
+4.  *Nunavut vs. Yukon:* There's a significant difference in migration
+    numbers between Nunavut and Yukon. The p-value is extremely low,
+    indicating a clear distinction in migration patterns between these
+    territories.
+
+**These results support the alternate hypothesis, suggesting that
+certain provinces consistently attract significantly different numbers
+of migrants. Ontario and Alberta emerge as leading destinations, drawing
+considerably higher migration numbers compared to Nunavut and Yukon.
+Additionally, Nunavut and Yukon showcase notably lower migration numbers
+compared to the provinces, indicating a distinct migration pattern
+between territories and provinces.**
+
+------------------------------------------------------------------------
+
+**HYPOTHESIS 4 : There is a changing trend in interprovincial migration
+patterns over the years, reflecting evolving factors that influence
+people's decisions to relocate within Canada.**
+
+*Null Hypothesis (H0):* There is no difference in the distribution of
+interprovincial migration patterns over the years.
+
+*Alternate Hypothesis (H1):* There exists a difference in the
+distribution of interprovincial migration patterns over the years.
+
+## To test this hypothesis,we are using a Kolmogorov-Smirnov test (KS test)
+
+```{r}
+# Aggregate Migration Count by Year in each range
+sum_range_1 <- aggregate(Total ~ Year, data = range_1, FUN = sum)
+sum_range_2 <- aggregate(Total ~ Year, data = range_2, FUN = sum)
+sum_range_3 <- aggregate(Total ~ Year, data = range_3, FUN = sum)
+# Performing KS tests between aggregated migration counts
+ks_test_range1_range2 <- ks.test(sum_range_1$Total, sum_range_2$Total)
+ks_test_range1_range3 <- ks.test(sum_range_1$Total, sum_range_3$Total)
+ks_test_range2_range3 <- ks.test(sum_range_2$Total, sum_range_3$Total)
+# Printing the test results
+print(ks_test_range1_range2)
+cat("---------------------------------")
+print(ks_test_range1_range3)
+cat("---------------------------------")
+print(ks_test_range2_range3)
+```
+
+*OBSERVATIONS :*
+
+The Kolmogorov-Smirnov (KS) test results suggest interesting findings
+regarding the distribution of interprovincial migration patterns across
+the specified time ranges.
+
+**Range 1 vs. Range 2:** The KS test between the migration counts of
+Range 1 (1971-1991) and Range 2 (1992-2006) indicates a significant
+difference in their distributions (p-value = 1.628e-05). This suggests
+that there's a notable change or shift in migration patterns between
+these time periods.
+
+**Range 1 vs. Range 3:** The KS test between the migration counts of
+Range 1 (1971-1991) and Range 3 (2007-2022) also reveals a significant
+difference in their distributions (p-value = 0.002707). This further
+emphasizes a substantial shift or alteration in migration trends over
+time.
+
+**Range 2 vs. Range 3:** However, the KS test between the migration
+counts of Range 2 (1992-2006) and Range 3 (2007-2022) does not show a
+significant difference (p-value = 0.1879). This suggests that the
+migration patterns between these periods might be relatively similar.
+
+-   Given these results, the evidence supports rejecting the null
+    hypothesis for comparisons between Range 1 vs. Range 2 and Range 1
+    vs. Range 3. This implies that there are notable differences in
+    migration distributions between these time frames.
+
+-   However, for Range 2 vs. Range 3, the p-value is not significant,
+    suggesting that the distributions might not differ significantly
+    between these periods.
+
+Thus, there is support for the alternative hypothesis (H1) that
+indicates differences in migration distributions between certain
+periods, signifying changing trends in interprovincial migration
+patterns over the years.
+
+------------------------------------------------------------------------
+
+# CONCLUSION {#section-six}
+
+The project on analyzing changing interprovincial migration trends in
+Canada from 1971 to 2022 has yielded valuable insights through various
+statistical tests, shedding light on different aspects of migration
+patterns within the country.
+
+**Chi-Square Test:**
+
+The Chi-Square test outcomes suggest that there isn't a significant
+relationship between the timing (years/quarters) and migration counts
+among Canadian provinces. This implies that migration trends might not
+be notably influenced by specific temporal patterns on a yearly or
+quarterly basis.
+
+**T-Test Findings:**
+
+The T-test results strongly support the alternate hypothesis,
+highlighting that specific provinces consistently attract significantly
+higher numbers of migrants. Ontario and Alberta emerge as primary
+destinations, drawing notably higher migration figures compared to
+Nunavut and Yukon. This emphasizes distinct migration patterns between
+territories and provinces, with the latter attracting considerably more
+migrants.
+
+**KS Test Insights:**
+
+The Kolmogorov-Smirnov (KS) test results provide evidence supporting the
+idea of changing trends in interprovincial migration patterns over time.
+Notably, there are significant differences in migration distributions
+between certain periods, indicating evolving migration trends across the
+years studied.
+
+In conclusion, these comprehensive statistical analyses offer nuanced
+insights into Canada's interprovincial migration dynamics. They uncover
+the influence of specific provinces in attracting migrants, highlight
+the absence of clear temporal migration patterns, and confirm the
+presence of changing trends in migration distributions over the studied
+decades. This research contributes significantly to understanding
+population mobility within Canada, with implications across diverse
+fields such as economics, sociology, policy development, and urban
+planning.
+
+------------------------------------------------------------------------
+
+# REFERNCES {#section-seven}
+
+1.  DATASET Source : Estimates of interprovincial migrants by province
+    or territory of origin and destination, quarterly and yearly in
+    Canada from 1971 to 2022.
+    (<https://catalogue.data.gov.bc.ca/dataset/inter-provincial-and-international-migration/resource/f6171cc3-3845-40dd-9855-d87e8f524064/>)
+
+2.  ADSC1910_01 - Applied Data Science/ Lecture Notes
+
+3.  Hypothesis Testing :
+    <https://www.r-bloggers.com/2022/12/hypothesis-testing-in-r/>
+
+4.  Interactive Plots in R :
+    <https://r-graph-gallery.com/interactive-charts.html>

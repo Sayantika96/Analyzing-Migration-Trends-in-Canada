@@ -53,6 +53,7 @@ Analyzing-Migration-Trends-in-Canada
     |___jNotebooks/
         |___analyzingMigrationTrendsUsingPython.ipynb
     |___finalReport.pdf
+    |___finalReport.html
     |___README.md
     |___requirments.txt
 ```
