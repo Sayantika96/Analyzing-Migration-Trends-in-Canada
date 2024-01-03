@@ -49,7 +49,7 @@ This dataset tracks interprovincial migration patterns in Canada over several de
 Analyzing-Migration-Trends-in-Canada
     |___data/
     |___rScripts/
-        |___analyzingMigrationTrendsUsingR.md
+        |___analyzingMigrationTrendsUsingR.rmd
     |___jNotebooks/
         |___analyzingMigrationTrendsUsingPython.ipynb
     |___finalReport.pdf
